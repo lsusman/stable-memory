@@ -38,36 +38,18 @@ for i=1:TotalSteps
     xlp = ((-xlp + x/5e-2)/tau)*dt;
     y = y + (r - y)*dt/tauy;
     x = x + (-x + W*r)*dt;
-    L = r*y' - y*r';
-% %     hs = (r0 - rlp)*ones(1,N);  % additive, activity-dependent rate control
-% %     hs = (1 - r'*r/sqrt(N))*W;    % multiplicative, averaged rate control
-
 %%% Homeostatic rules
     hs = B - tanh(x - xlp)*tanh(x)';
-%     hs = (r0 - r)*ones(N,1)'*W;
 %     hs = (r0 - r)*r'*W;
 %     hs = -beta*W;
 
     noise = (1*randn(N,N))/sqrt(N);
     W = W + etaS*(noise + hs)*dt;
     
-
     if ~mod(i-1,CalcEvery)
         W_all(:,:,(i-1)/CalcEvery + 1) = W;
         hs_all(:,:,(i-1)/CalcEvery + 1) = hs/2 + hs'/2;
         noise_all(:,:,(i-1)/CalcEvery + 1) = noise/2 + noise'/2;
-        S = hs/2 + hs'/2;
-        S = S(:);
-        Ps((i-1)/CalcEvery + 1) = hs(:)'*S/(norm(S));
-        A = hs/2 - hs'/2;
-        A = A(:);
-        Pa((i-1)/CalcEvery + 1) = hs(:)'*A/(norm(A));
-        S = noise/2 + noise'/2;
-        S = S(:);
-        Psnoise((i-1)/CalcEvery + 1) = noise(:)'*S/(norm(S));
-        A = noise/2 - noise'/2;
-        A = A(:);
-        Panoise((i-1)/CalcEvery + 1) = noise(:)'*A/(norm(A));
         disp((i-1)/TotalSteps);
     end
     
@@ -94,37 +76,6 @@ plot(taxis,imag(Dseq(I(1),:)),'linewidth',2,'color',[.47 .67 .19]); hold on;
 plot(taxis,imag(Dseq(I(end),:)),'linewidth',2,'color',[.47 .67 .19]); hold on;
 set(gca,'fontsize',18);ylabel('Im(\lambda)');
 xlabel('time'); box off;
-
-
-% [~,Dseq] = eigenshuffle(noise_all);
-% for j=1:1:N
-%     figure(202); plot(real(Dseq(j,:)),'linewidth',2,'color','k'); hold on; 
-% end
-% hold on;
-% [~,Dseq] = eigenshuffle(hs_all);
-% for j=1:1:N
-%     figure(202); plot(real(Dseq(j,:)),'linewidth',2,'color','r'); hold on; 
-% end
-
-figure; plot(Ps,Pa,'o'); hold on; plot(Psnoise,Panoise,'o'); axis square;
-xlabel('S'); ylabel('A');
-
-STD = nan(N,N);
-for i=1:N
-    for j=1:N
-        STD(i,j) = std(W_all(i,j,:));
-    end
-end
-mean(STD(:))
-
-figure; plot(x_all')
-
-S = W/2 + W'/2;
-A = W/2 - W'/2;
-S = S(:);
-A = A(:);
-PsW = W(:)'*S/norm(S)
-PaW = W(:)'*A/norm(A)
 
 
 toc
