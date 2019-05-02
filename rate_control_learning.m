@@ -1,69 +1,73 @@
 
-%  Simulate rate network with decorrelation homeostasis
-%%%%  Load pre-initialized network
+%  Simulate rate network with rate-control homeostasis
 %%%%  Dynamically learn one memory item
 
 clear all; clc;
 close all;
 
-load('data');
-seed = data.decseed;
-rng(seed);
-N = 128;
-Nmem = 1;
-dt = .1;
-eta = .01;
-tau = 50;
-taux = 20;
-zeta = .01;
-amp = 25;
-inLen = 100/dt;
-spacing = 1000/dt;
-spacing0 = 200/dt;
-TotalSteps = spacing0 + (inLen + spacing)*Nmem;
-CalcEvery = 10/dt;
-Nsteps = TotalSteps/CalcEvery;
+load('data'); 
+rng(data.rcseed);
 
-y = zeros(N,1);
-z = zeros(N,1);
-x_all = zeros(N,TotalSteps);
-H = sign(randn(N));
+N = 128;
+dt = .1;
+etaS = .01;
+g = 1.0;
+tau = 20;
+tauy = 100;
+Nmem = 1;
+
+TotalSteps = 3000/dt - 1;
+CalcEvery = 10/dt;
+Nsteps = (TotalSteps+1)/CalcEvery;
+
+x = randn(N,1);
+x_all = nan(N,TotalSteps);
+xlp = randn;
+W_all = nan(N,N,Nsteps);
+hs_all = nan(N,N,Nsteps);
+noise_all = nan(N,N,Nsteps);
+W = 2*randn(N)/sqrt(N);
+r0 = 2*(rand(N,1) - .5);
+zeta = .01;
+y = randn(N,1);
+
+H = sign(randn(N,N)/sqrt(N));
 u = H(1:Nmem,:)'/sqrt(N);
 v = H(Nmem+1:2*Nmem,:)'/sqrt(N);
 input1 = zeros(N,TotalSteps);
 input2 = zeros(N,TotalSteps);
-W_all = zeros(N,N,Nsteps);
-input = zeros(N,1);
-xlp = 0;
-B = .5*eye(N);
-W = data.W;
-x = data.x;
+base = 500/dt;
+inLen = 100/dt;
+input = 0;
 
 f = waitbar(0,'Simulating, please wait...');
 
 %%%% Construct input signal for learning
 for i = 1:Nmem
-    base = (i-1)*spacing + spacing0;
     input1(:,base+1:base+inLen) = repmat(u(:,i),1,inLen);
     input2(:,base+1:base+inLen) = repmat(v(:,i),1,inLen);
 end
 
 %%%% Evolve network
 for i=1:TotalSteps
+   
+    x_all(:,i) = x;
+    r = tanh(g*x);
+    xlp = ((-xlp + x/5e-2)/tau)*dt;
+    y = y + (r - y)*dt/tauy; 
+    input = input + (-zeta*input + randn*input1(:,i) + randn*input2(:,i))*dt;
+    
+    x = x + (-x + W*r + 10*input)*dt;
+    L = r*y' - y*r';
+    hs = (r0 - r)*r'*W;
+
+    noise = (1*randn(N,N))/sqrt(N);
+    W = W + etaS*(noise + hs + L)*dt;
     
     if ~mod(i-1,CalcEvery)
         W_all(:,:,(i-1)/CalcEvery + 1) = W;
         waitbar((i-1)/TotalSteps,f,'Simulating, please wait...');
     end
-    
-    x_all(:,i) = x;
-    r = tanh(x);
-    xlp = ((-xlp + x/1e-2)/taux)*dt;
-    input = input + (-zeta*input + randn*input1(:,i) + randn*input2(:,i))*dt;
-    
-    y = y + (r - y)*dt/tau;  
-    x = x + (-x + W*r + amp*input)*dt;
-    W = W + eta*((B - tanh(x - xlp)*tanh(x)' + randn(N)/sqrt(N)) + (r*y' - y*r'))*dt;
 end
 
 %%%% Compute eigenspectrum of W over time
